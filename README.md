@@ -31,3 +31,11 @@ npm run build    # xuất bản ra dist/
 - Tốc độ: các hệ số nhân `t` trong hàm `ribbons()` và `background()`.
 
 Di chuột để làm sóng lệch nhẹ. Hỗ trợ `prefers-reduced-motion`.
+
+## Deploy
+
+Workflow `.github/workflows/deploy.yml` tự build và deploy lên GitHub Pages
+mỗi khi push lên `main` (hoặc chạy tay qua tab *Actions*).
+Cần bật một lần: **Settings → Pages → Source: GitHub Actions**.
+
+Trang: https://tuanhuycao19.github.io/visualizer/
