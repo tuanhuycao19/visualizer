@@ -32,10 +32,28 @@ npm run build    # xuất bản ra dist/
 
 Di chuột để làm sóng lệch nhẹ. Hỗ trợ `prefers-reduced-motion`.
 
+## Trang 2 — Doanh số xe Trung Quốc 3D (`/sales/`)
+
+Biểu đồ cột ngang 3D (three.js) cho doanh số xe Trung Quốc tại Việt Nam
+tháng 9/2026: các cột bóng mọc lên lần lượt, số đếm tăng dần, vệt sáng quét
+dọc cột; nền abstract chuyển động nhẹ (sương xoáy, dải sáng, bụi bokeh,
+vòng tròn trôi). Di chuột để xoay nhẹ góc nhìn và làm nổi một hàng;
+nút **Phát lại** chạy lại animation. Màn hình dọc tự đổi bố cục (nhãn nằm trên cột).
+
+| File | Vai trò |
+| --- | --- |
+| `sales/index.html` | Tiêu đề, nhãn, chân trang |
+| `src/sales/data.js` | Số liệu + màu từng hãng (sửa ở đây khi có tháng mới) |
+| `src/sales/main.js` | Scene 3D, bố cục/camera, timeline animation, nhãn HTML gắn theo cột |
+| `src/sales/background.js` | Shader nền, bụi hạt, vòng tròn |
+| `src/sales/style.css` | Font, badge hạng, animation tiêu đề |
+
+Chạy `npm run dev` rồi mở http://localhost:5173/sales/
+
 ## Deploy
 
 Workflow `.github/workflows/deploy.yml` tự build và deploy lên GitHub Pages
 mỗi khi push lên `main` (hoặc chạy tay qua tab *Actions*).
 Cần bật một lần: **Settings → Pages → Source: GitHub Actions**.
 
-Trang: https://tuanhuycao19.github.io/visualizer/
+Trang: https://tuanhuycao19.github.io/visualizer/ và https://tuanhuycao19.github.io/visualizer/sales/
