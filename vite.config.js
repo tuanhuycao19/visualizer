@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         sales: resolve(import.meta.dirname, 'sales/index.html'),
+        butterflies: resolve(import.meta.dirname, 'butterflies/index.html'),
       },
     },
   },

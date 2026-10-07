@@ -50,7 +50,28 @@ nút **Phát lại** chạy lại animation. Màn hình dọc tự đổi bố c
 
 Chạy `npm run dev` rồi mở http://localhost:5173/sales/
 
-## Quay & tải video (cả 2 trang)
+## Trang 3 — Mối Duyên Vàng (`/butterflies/`)
+
+Hai cánh bướm — một tím viền vàng, một vàng viền tím — bay vòng quanh nhau,
+nối với nhau bằng một sợi tơ vàng lấp lánh (có các nhịp sáng chạy dọc sợi),
+mỗi con kéo theo một vệt sáng và rắc kim tuyến. Nền tím hoàng gia ánh lụa
+với quầng vàng, mây tường vân (cuộn xoắn viền vàng) trôi ở nhiều tầng,
+cành lá tím–vàng đung đưa ở hai góc, lá rơi xoay và bụi vàng.
+Hai con bay vào từ hai phía khi mở trang; chạm/bấm để chúng xích lại gần
+nhau trong một vụ nổ kim tuyến.
+
+| File | Vai trò |
+| --- | --- |
+| `butterflies/index.html` | Tiêu đề, dòng gợi ý |
+| `src/butterflies/main.js` | Scene, quỹ đạo bay, sợi tơ, tương tác, quay video |
+| `src/butterflies/butterfly.js` | Cánh bướm (vẽ bằng canvas, uốn & vỗ trong shader), thân, bảng màu |
+| `src/butterflies/scenery.js` | Nền shader, mây tường vân, cành lá, lá rơi, vòng hào quang, bụi vàng |
+| `src/butterflies/effects.js` | Dải sáng (vệt bay, sợi tơ) và kim tuyến |
+| `src/butterflies/style.css` | Font Cormorant Garamond, chữ vàng ánh kim |
+
+Chạy `npm run dev` rồi mở http://localhost:5173/butterflies/
+
+## Quay & tải video (cả 3 trang)
 
 Nút **● Quay video** ở góc trên bên phải (hoặc phím **R**):
 
@@ -80,4 +101,4 @@ Workflow `.github/workflows/deploy.yml` tự build và deploy lên GitHub Pages
 mỗi khi push lên `main` (hoặc chạy tay qua tab *Actions*).
 Cần bật một lần: **Settings → Pages → Source: GitHub Actions**.
 
-Trang: https://tuanhuycao19.github.io/visualizer/ và https://tuanhuycao19.github.io/visualizer/sales/
+Trang: https://tuanhuycao19.github.io/visualizer/, https://tuanhuycao19.github.io/visualizer/sales/ và https://tuanhuycao19.github.io/visualizer/butterflies/
