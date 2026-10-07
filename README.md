@@ -50,6 +50,30 @@ nút **Phát lại** chạy lại animation. Màn hình dọc tự đổi bố c
 
 Chạy `npm run dev` rồi mở http://localhost:5173/sales/
 
+## Quay & tải video (cả 2 trang)
+
+Nút **● Quay video** ở góc trên bên phải (hoặc phím **R**):
+
+1. Chọn thời lượng (5 / 10 / 15 / 30 / 60 giây, hoặc *Dừng tay*).
+2. Bấm quay: animation intro tự chạy lại từ đầu để video bắt đầu đúng lúc.
+3. Khi dừng, file được tải về tự động (kèm khung xem thử và nút **Tải về**).
+
+Video có độ phân giải bằng khung hình đang hiển thị (× devicePixelRatio,
+tối đa 3840 px) — muốn video dọc 9:16 thì thu nhỏ cửa sổ/dùng điện thoại.
+Định dạng: **MP4 (H.264)** trên Chrome/Edge/Safari mới, **WebM** trên Firefox.
+Mọi thứ xử lý trong trình duyệt, không upload đi đâu.
+
+Cách hoạt động: mỗi khung hình, canvas WebGL được chép sang một canvas 2D,
+rồi phần chữ HTML (tiêu đề, nhãn, số, chữ ký, logo…) được vẽ đè lên theo
+style đang tính toán của trình duyệt, nên các animation CSS cũng có trong video.
+Phần tử gắn `data-record-ignore` (nút quay, nút *Phát lại*) không xuất hiện trong video.
+
+| File | Vai trò |
+| --- | --- |
+| `src/record/recorder.js` | Nút quay, MediaRecorder, tải file |
+| `src/record/paint-dom.js` | Vẽ lớp HTML lên canvas (chữ, gradient, badge, SVG, bóng, clip-path) |
+| `src/record/recorder.css` | Giao diện nút quay / khung xem thử |
+
 ## Deploy
 
 Workflow `.github/workflows/deploy.yml` tự build và deploy lên GitHub Pages

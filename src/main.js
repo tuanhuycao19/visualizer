@@ -1,5 +1,6 @@
 import './style.css';
 import { vertexSource, fragmentSource } from './shader.js';
+import { createRecorder } from './record/recorder.js';
 
 const canvas = document.getElementById('waves');
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
@@ -57,6 +58,12 @@ window.addEventListener('pointermove', (e) => {
   mouse.ty = -((e.clientY / window.innerHeight) * 2 - 1);
 });
 
+const recorder = createRecorder({
+  canvas,
+  overlays: [document.querySelector('.poster')],
+  name: 'new-act',
+});
+
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speed = reducedMotion ? 0.15 : 1;
 const start = performance.now();
@@ -70,6 +77,7 @@ function frame(now) {
   gl.uniform1f(uTime, ((now - start) / 1000) * speed);
   gl.uniform2f(uMouse, mouse.x, mouse.y);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  recorder.capture();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

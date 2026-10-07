@@ -1,0 +1,152 @@
+.rec {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  font: 600 13px/1.2 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #eef3ff;
+}
+
+.rec__bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(6, 12, 40, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  opacity: 0.55;
+  transition: opacity 0.2s;
+}
+
+.rec:hover .rec__bar,
+.rec:focus-within .rec__bar,
+.rec.is-recording .rec__bar { opacity: 1; }
+
+.rec__btn,
+.rec__dur select,
+.rec__close,
+.rec__download {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rec__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 11px;
+  background: rgba(255, 255, 255, 0.1);
+  font-variant-numeric: tabular-nums;
+  transition: background 0.2s;
+}
+
+.rec__btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+.rec__btn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.rec__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b4a;
+  box-shadow: 0 0 0 2px rgba(255, 59, 74, 0.25);
+}
+
+.rec.is-recording .rec__btn { background: rgba(255, 59, 74, 0.22); }
+.rec.is-recording .rec__dot {
+  border-radius: 2px;
+  animation: rec-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes rec-pulse { to { opacity: 0.35; } }
+
+.rec__dur select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 7px 12px;
+  background: transparent;
+}
+
+.rec__dur select:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.rec__dur select:disabled { opacity: 0.5; cursor: default; }
+.rec__dur option { color: #0d1c4a; }
+
+.rec__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.rec :focus-visible { outline: 2px solid #9fd8ff; outline-offset: 2px; }
+
+.rec__result {
+  width: min(300px, calc(100vw - 24px));
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(6, 12, 40, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+}
+
+.rec__result[hidden] { display: none; }
+
+.rec__preview {
+  display: block;
+  width: 100%;
+  max-height: 40vh;
+  border-radius: 8px;
+  background: #000;
+}
+
+.rec__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rec__download {
+  flex: 1;
+  padding: 8px 12px;
+  text-align: center;
+  text-decoration: none;
+  color: #0d1c4a;
+  background: linear-gradient(180deg, #ffffff, #dbe7ff);
+}
+
+.rec__close {
+  width: 34px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rec__close:hover { background: rgba(255, 255, 255, 0.2); }
+
+.rec__meta {
+  margin: 6px 2px 0;
+  font-weight: 500;
+  font-size: 11px;
+  color: rgba(214, 226, 255, 0.7);
+}
+
+/* Small screens: icon-only button (the timer still shows while recording). */
+@media (max-width: 560px) {
+  .rec { top: 8px; right: 8px; }
+  .rec:not(.is-recording) .rec__label { display: none; }
+  .rec__btn { padding: 9px; }
+  .rec.is-recording .rec__btn { padding: 7px 12px 7px 10px; }
+  .rec__dur select { padding: 7px 8px; }
+}

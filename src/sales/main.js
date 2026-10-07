@@ -8,6 +8,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { sales, period } from './data.js';
 import { createBackdrop, createDust, createRings } from './background.js';
+import { createRecorder } from '../record/recorder.js';
 
 const canvas = document.getElementById('scene');
 const labelsEl = document.getElementById('labels');
@@ -283,6 +284,13 @@ function replay() {
 }
 document.getElementById('replay').addEventListener('click', replay);
 
+const recorder = createRecorder({
+  canvas,
+  overlays: [labelsEl, headerEl, footerEl],
+  name: 'doanh-so-xe-trung-quoc',
+  onStart: replay,
+});
+
 // ---------- Animation helpers ----------
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
@@ -390,6 +398,7 @@ function frame(ts) {
   totalEl.textContent = fmt.format(runningTotal);
 
   composer.render();
+  recorder.capture();
   requestAnimationFrame(frame);
 }
 
