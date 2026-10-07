@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // border band, `vein` the vein lines, `spot` the eye spot rings.
 export const PALETTES = {
   violet: {
-    fill: ['#1d0538', '#43108a', '#7a35d4', '#b07af2'],
+    fill: ['#1c1838', '#3d3a7a', '#7579bd', '#bfc2ec'],
     trim: '#f3c768',
     vein: 'rgba(246, 210, 130, 0.55)',
     spot: ['#f8dc8c', '#3a0b6b', '#fff6dc'],

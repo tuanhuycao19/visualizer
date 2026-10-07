@@ -52,22 +52,23 @@ Chạy `npm run dev` rồi mở http://localhost:5173/sales/
 
 ## Trang 3 — Mối Duyên Vàng (`/butterflies/`)
 
-Hai cánh bướm — một tím viền vàng, một vàng viền tím — bay vòng quanh nhau,
-nối với nhau bằng một sợi tơ vàng lấp lánh (có các nhịp sáng chạy dọc sợi),
-mỗi con kéo theo một vệt sáng và rắc kim tuyến. Nền tím hoàng gia ánh lụa
-với quầng vàng, mây tường vân (cuộn xoắn viền vàng) trôi ở nhiều tầng,
-cành lá tím–vàng đung đưa ở hai góc, lá rơi xoay và bụi vàng.
-Hai con bay vào từ hai phía khi mở trang; chạm/bấm để chúng xích lại gần
-nhau trong một vụ nổ kim tuyến.
+Bố cục kiểu bìa album: nền than chì, một vòng hoa mây cuộn màu nước
+(kem, tím lam, đất nung, hồng phấn, vàng đất) xoay chậm, tiêu đề thư pháp
+"Mối Duyên Vàng" kèm triện đỏ ở phía trên vòng mây; hai cánh bướm (tím lam
+và vàng) bay vòng quanh nhau bên trong, nối bằng sợi tơ vàng lấp lánh;
+một chiếc quạt xếp vàng xòe ra từ mép dưới với dòng chữ trên quạt, lá
+nhiệt đới và hoa màu đào ló ra hai bên, cánh hoa rơi.
+Khi mở trang: mây lần lượt cuộn vào vòng, quạt xòe, chữ hiện dần, hai con
+bướm bay vào từ hai phía. Chạm/bấm để chúng xích lại gần nhau.
 
 | File | Vai trò |
 | --- | --- |
-| `butterflies/index.html` | Tiêu đề, dòng gợi ý |
-| `src/butterflies/main.js` | Scene, quỹ đạo bay, sợi tơ, tương tác, quay video |
+| `butterflies/index.html` | Tiêu đề thư pháp + triện, chữ trên quạt, dòng gợi ý |
+| `src/butterflies/main.js` | Bố cục (vòng mây, quạt, vị trí chữ), quỹ đạo bay, sợi tơ, tương tác, quay video |
 | `src/butterflies/butterfly.js` | Cánh bướm (vẽ bằng canvas, uốn & vỗ trong shader), thân, bảng màu |
-| `src/butterflies/scenery.js` | Nền shader, mây tường vân, cành lá, lá rơi, vòng hào quang, bụi vàng |
+| `src/butterflies/scenery.js` | Nền than chì, vòng mây màu nước, quạt xếp (shader), lá & hoa, cánh hoa rơi |
 | `src/butterflies/effects.js` | Dải sáng (vệt bay, sợi tơ) và kim tuyến |
-| `src/butterflies/style.css` | Font Cormorant Garamond, chữ vàng ánh kim |
+| `src/butterflies/style.css` | Font Great Vibes (thư pháp) + Oswald, triện đỏ, animation chữ |
 
 Chạy `npm run dev` rồi mở http://localhost:5173/butterflies/
 

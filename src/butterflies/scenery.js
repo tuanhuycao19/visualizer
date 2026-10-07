@@ -1,17 +1,27 @@
 import * as THREE from 'three';
 
-// Everything behind the butterflies: a silky purple backdrop with a golden
-// glow, auspicious-cloud motifs (tường vân) drifting at different depths,
-// leafy branches in two corners, a few loose leaves and golden dust.
+// Everything around the butterflies, laid out like an album cover: a charcoal
+// backdrop, a wreath of watercolour swirl-clouds, a golden folding fan rising
+// from the bottom edge and tropical leaves with peach flowers peeking out
+// from behind it.
 
-const GOLD = '#f4cd78';
-const LEAF_STYLES = {
-  purple: ['#25093f', '#5a1fa3', '#a173ea'],
-  plum: ['#3a0c42', '#7d2a88', '#c983d4'],
-  gold: ['#6b420b', '#c38d2c', '#f7d98f'],
+// Watercolour palettes: [wash, line, highlight].
+const INKS = {
+  cream: ['#e8d7b0', '#8f6f45', '#fff7e2'],
+  lavender: ['#8e94c4', '#454a7c', '#e1e3f8'],
+  terracotta: ['#bf6c4a', '#6a2c1c', '#f3c5a8'],
+  rose: ['#d2a192', '#7a463c', '#f7e0d5'],
+  ochre: ['#d0a55a', '#77531f', '#f8e4b3'],
 };
+// Order around the wreath, starting at the top and going anticlockwise.
+const WREATH = [
+  'lavender', 'cream', 'rose', 'ochre', 'cream', 'terracotta',
+  'lavender', 'rose', 'terracotta', 'cream', 'ochre',
+];
 
-// ---------- Backdrop shader ----------
+const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+
+// ---------- Backdrop ----------
 
 const backdropVertex = /* glsl */ `
   void main() {
@@ -22,8 +32,9 @@ const backdropVertex = /* glsl */ `
 const backdropFragment = /* glsl */ `
   precision highp float;
   uniform vec2 uRes;
+  uniform vec2 uCenter; // ring centre, pixels
+  uniform float uRadius; // ring radius, pixels
   uniform float uTime;
-  uniform vec2 uMouse;
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -40,10 +51,9 @@ const backdropFragment = /* glsl */ `
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
-    mat2 r = mat2(0.8, -0.6, 0.6, 0.8);
     for (int i = 0; i < 5; i++) {
       v += a * noise(p);
-      p = r * p * 2.03;
+      p = p * 2.03 + 17.0;
       a *= 0.5;
     }
     return v;
@@ -51,32 +61,23 @@ const backdropFragment = /* glsl */ `
   vec3 lin(vec3 c) { return pow(c, vec3(2.2)); }
 
   void main() {
-    vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
-    vec2 q = p + uMouse * 0.02;
-    float t = uTime;
+    vec2 px = gl_FragCoord.xy;
+    vec2 p = px / uRes.y;
+    float d = length(px - uCenter) / max(uRadius, 1.0);
 
-    vec3 deep = lin(vec3(0.07, 0.02, 0.13));
-    vec3 royal = lin(vec3(0.24, 0.07, 0.40));
-    vec3 plum = lin(vec3(0.46, 0.14, 0.52));
-    vec3 gold = lin(vec3(1.0, 0.76, 0.36));
+    vec3 dark = lin(vec3(0.085, 0.085, 0.095));
+    vec3 mid = lin(vec3(0.24, 0.235, 0.245));
+    vec3 col = mix(mid, dark, smoothstep(0.2, 1.9, d));
 
-    float warp = fbm(q * 1.6 - vec2(t * 0.02, t * 0.013));
-    float n = fbm(q * 1.2 + vec2(t * 0.015, -t * 0.01) + warp * 1.4);
-    vec3 col = mix(deep, royal, smoothstep(0.25, 0.8, n));
-    col = mix(col, plum, smoothstep(0.6, 0.95, n) * 0.45);
+    // Paper / ink-wash mottling, drifting very slowly.
+    float n = fbm(p * 3.0 + vec2(uTime * 0.01, -uTime * 0.007));
+    col *= 0.9 + 0.2 * n;
+    // Faint warm light from the top.
+    col += lin(vec3(0.2, 0.17, 0.13)) * 0.25 * smoothstep(0.4, 1.0, px.y / uRes.y) * (1.0 - smoothstep(0.0, 1.6, d));
 
-    // Silk sheen: soft diagonal folds.
-    float silk = sin((q.x * 0.9 + q.y) * 7.0 + warp * 5.0 + t * 0.12);
-    col += royal * 0.25 * smoothstep(0.55, 1.0, silk);
-
-    // Golden glow behind the pair, breathing slowly.
-    float d = length(q - vec2(0.0, -0.03));
-    col += gold * (0.07 + 0.02 * sin(t * 0.7)) * exp(-d * d * 7.0);
-    col += plum * 0.18 * exp(-d * d * 1.5);
-
-    float vig = smoothstep(1.3, 0.25, length(p * vec2(0.85, 1.05)));
-    col *= mix(0.4, 1.0, vig);
-    col += (hash(gl_FragCoord.xy + fract(t) * 71.0) - 0.5) * 0.01;
+    float vig = smoothstep(1.45, 0.3, length((px / uRes - 0.5) * vec2(1.0, 1.1)));
+    col *= mix(0.55, 1.0, vig);
+    col += (hash(px + fract(uTime) * 61.0) - 0.5) * 0.008;
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -87,8 +88,9 @@ function createBackdrop() {
     fragmentShader: backdropFragment,
     uniforms: {
       uRes: { value: new THREE.Vector2(1, 1) },
+      uCenter: { value: new THREE.Vector2() },
+      uRadius: { value: 1 },
       uTime: { value: 0 },
-      uMouse: { value: new THREE.Vector2() },
     },
     depthWrite: false,
     depthTest: false,
@@ -99,14 +101,7 @@ function createBackdrop() {
   return mesh;
 }
 
-// ---------- Canvas artwork ----------
-
-function canvasTexture(canvas) {
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
+// ---------- Canvas helpers ----------
 
 function makeCanvas(w, h) {
   const c = document.createElement('canvas');
@@ -115,198 +110,382 @@ function makeCanvas(w, h) {
   return [c, c.getContext('2d')];
 }
 
-// Auspicious cloud: overlapping round lobes with a gold outline, a spiral
-// curl inside each lobe and a sweeping tail.
-const CLOUDS = [
-  { lobes: [[250, 300, 95], [370, 228, 122], [512, 250, 104], [632, 300, 84], [724, 334, 58]], tail: 1 },
-  { lobes: [[220, 318, 70], [322, 258, 100], [452, 218, 116], [584, 250, 100], [694, 300, 80], [792, 334, 54]], tail: -1 },
-  { lobes: [[330, 290, 104], [470, 246, 96], [596, 286, 82], [700, 318, 56]], tail: 1 },
-];
+function texture(canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
 
-function drawCloud(spec) {
-  const [canvas, ctx] = makeCanvas(1024, 512);
-  const outline = 8;
-  const { lobes } = spec;
+function rng(seed) {
+  let s = seed % 2147483647 || 1;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
 
-  // Tail: a tapering gold swoosh leaving the first or last lobe.
-  const end = spec.tail > 0 ? lobes[0] : lobes[lobes.length - 1];
-  const dir = spec.tail > 0 ? -1 : 1;
-  ctx.strokeStyle = GOLD;
+const canBlur = 'filter' in CanvasRenderingContext2D.prototype;
+
+// A tapered stroke along a list of points: width goes w0 → w1.
+function taper(ctx, pts, w0, w1, color, alpha = 1) {
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
   ctx.lineCap = 'round';
-  for (let i = 0; i < 18; i++) {
-    const k = i / 17;
-    ctx.lineWidth = 18 * (1 - k) + 2;
-    ctx.globalAlpha = 1 - k * 0.6;
-    const x0 = end[0] + dir * end[2] * 0.4 + dir * k * 170;
-    const y0 = end[1] + end[2] * 0.75 - Math.sin(k * Math.PI * 0.9) * 40 - k * k * 30;
-    const x1 = end[0] + dir * end[2] * 0.4 + dir * (k + 1 / 17) * 170;
-    const k1 = k + 1 / 17;
-    const y1 = end[1] + end[2] * 0.75 - Math.sin(k1 * Math.PI * 0.9) * 40 - k1 * k1 * 30;
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineWidth = w0 + (w1 - w0) * (i / (pts.length - 1));
     ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
+    ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+    ctx.lineTo(pts[i][0], pts[i][1]);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
+}
 
-  ctx.fillStyle = GOLD;
-  for (const [x, y, r] of lobes) {
+function spiral(cx, cy, r0, r1, turns, a0, dir = 1, steps = 120) {
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const k = i / steps;
+    const a = a0 + dir * k * turns * Math.PI * 2;
+    const r = r0 + (r1 - r0) * k;
+    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+  }
+  return pts;
+}
+
+// ---------- Watercolour swirl-cloud ----------
+// A long body that swells from a wispy tail (left) to a rolled curl (right),
+// washed in soft colour with brush-line details.
+function drawSwirl(ink, seed) {
+  const [wash, line, light] = INKS[ink];
+  const W = 1024;
+  const H = 512;
+  const [canvas, ctx] = makeCanvas(W, H);
+  const rand = rng(seed * 7919 + 13);
+
+  const N = 90;
+  const amp = 50 + rand() * 40;
+  const ph = rand() * Math.PI * 2;
+  const spine = [];
+  for (let i = 0; i < N; i++) {
+    const k = i / (N - 1);
+    spine.push({
+      x: 50 + k * 640,
+      y: 270 + Math.sin(k * Math.PI * 1.4 + ph) * amp * (1 - k * 0.7),
+      r: 4 + Math.pow(k, 1.5) * (82 + rand() * 4),
+    });
+  }
+  const head = spine[N - 1];
+  const hx = head.x + 40;
+  const hy = head.y - 10;
+  const hr = 118;
+
+  const body = new Path2D();
+  for (const s of spine) {
+    body.moveTo(s.x + s.r, s.y);
+    body.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+  }
+  body.moveTo(hx + hr, hy);
+  body.arc(hx, hy, hr, 0, Math.PI * 2);
+
+  // Wash: a blurred bleed, then the body, then a lighter top light.
+  ctx.save();
+  if (canBlur) ctx.filter = 'blur(10px)';
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = wash;
+  ctx.fill(body);
+  ctx.restore();
+
+  const g = ctx.createLinearGradient(40, 0, hx + hr, 0);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(0.18, wash);
+  g.addColorStop(1, wash);
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = g;
+  ctx.fill(body);
+  ctx.globalAlpha = 1;
+
+  ctx.save();
+  ctx.clip(body);
+  if (canBlur) ctx.filter = 'blur(14px)';
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = light;
+  for (const s of spine.filter((_, i) => i % 6 === 0)) {
     ctx.beginPath();
-    ctx.arc(x, y, r + outline, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y - s.r * 0.45, s.r * 0.55, 0, Math.PI * 2);
     ctx.fill();
   }
-  const fill = ctx.createLinearGradient(0, 120, 0, 420);
-  fill.addColorStop(0, '#9b62e0');
-  fill.addColorStop(0.55, '#5b1fa0');
-  fill.addColorStop(1, '#2f0b5c');
-  ctx.fillStyle = fill;
-  for (const [x, y, r] of lobes) {
+  ctx.beginPath();
+  ctx.arc(hx - 20, hy - 40, hr * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  // Pigment pooling along the underside.
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = line;
+  for (const s of spine.filter((_, i) => i % 5 === 0)) {
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y + s.r * 0.8, s.r * 0.4, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
 
-  // Spiral curls.
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 6;
-  lobes.forEach(([x, y, r], i) => {
-    const turns = 1.7;
-    const a0 = i * 1.3;
-    ctx.beginPath();
-    for (let a = 0; a <= turns * Math.PI * 2; a += 0.05) {
-      const rr = r * (0.06 + 0.58 * (a / (turns * Math.PI * 2)));
-      const px = x + Math.cos(a + a0) * rr * (spec.tail > 0 ? 1 : -1);
-      const py = y + Math.sin(a + a0) * rr;
-      if (a === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+  // Grain.
+  ctx.save();
+  ctx.clip(body);
+  ctx.fillStyle = line;
+  for (let i = 0; i < 1400; i++) {
+    ctx.globalAlpha = 0.05 + rand() * 0.07;
+    ctx.fillRect(rand() * W, rand() * H, 1.5 + rand() * 2, 1.5 + rand() * 2);
+  }
+  ctx.restore();
+
+  // The rolled curl at the head: a light band and two ink lines.
+  taper(ctx, spiral(hx, hy, hr * 0.9, hr * 0.08, 1.8, -Math.PI * 0.4, -1), 20, 4, light, 0.5);
+  taper(ctx, spiral(hx, hy, hr * 0.78, hr * 0.06, 1.75, -Math.PI * 0.42, -1), 5, 2, line, 0.85);
+  taper(ctx, spiral(hx, hy, hr * 1.0, hr * 0.5, 0.7, -Math.PI * 0.35, -1), 4, 1.5, line, 0.6);
+
+  // A smaller curl rising off the back.
+  const mid = spine[Math.floor(N * 0.62)];
+  const sx = mid.x - 10;
+  const sy = mid.y - mid.r * 0.7;
+  taper(ctx, spiral(sx, sy, 38, 4, 1.4, Math.PI * 0.6, -1), 14, 3, light, 0.7);
+  taper(ctx, spiral(sx, sy, 32, 3, 1.4, Math.PI * 0.6, -1), 3.5, 1.5, line, 0.8);
+
+  // Brush lines following the body.
+  for (const off of [-0.45, 0.05, 0.5]) {
+    const pts = spine.slice(Math.floor(N * 0.25), N - 4).map((s) => [s.x, s.y + s.r * off]);
+    taper(ctx, pts, 1.2, 3.2, off < 0 ? light : line, off < 0 ? 0.8 : 0.55);
+  }
+
+  // Wispy tail strands.
+  for (let j = 0; j < 3; j++) {
+    const pts = [];
+    const dy = (j - 1) * 14;
+    for (let i = 0; i < 30; i++) {
+      const k = i / 29;
+      pts.push([60 + k * 260, 270 + dy + Math.sin(k * 5 + ph + j) * 12 + Math.sin(ph) * amp * (1 - k) * 0.6]);
     }
-    ctx.stroke();
-  });
+    taper(ctx, pts, 0.8, 3, j === 1 ? line : wash, 0.6);
+  }
   return canvas;
 }
 
-function leafPath(len, width) {
-  const p = new Path2D();
-  p.moveTo(0, 0);
-  p.bezierCurveTo(len * 0.25, -width * 0.9, len * 0.7, -width * 0.7, len, 0);
-  p.bezierCurveTo(len * 0.7, width * 0.7, len * 0.25, width * 0.9, 0, 0);
-  return p;
+// ---------- Folding fan ----------
+
+const fanVertex = /* glsl */ `
+  varying vec2 vPos;
+  void main() {
+    vPos = position.xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const fanFragment = /* glsl */ `
+  uniform float uOpen;
+  uniform float uTime;
+  varying vec2 vPos;
+  const float PI = 3.14159265;
+  vec3 lin(vec3 c) { return pow(c, vec3(2.2)); }
+
+  void main() {
+    float r = length(vPos);
+    float th = atan(vPos.y, vPos.x);
+    float span = max(uOpen * PI, 0.001);
+    // Opens from the right-hand guard stick anticlockwise.
+    if (th < 0.0 || th > span || r > 1.0) discard;
+    float u = th / span;
+
+    vec3 light = lin(vec3(0.96, 0.8, 0.47));
+    vec3 midc = lin(vec3(0.83, 0.62, 0.27));
+    vec3 deep = lin(vec3(0.52, 0.34, 0.12));
+    vec3 brown = lin(vec3(0.28, 0.16, 0.06));
+
+    float folds = 26.0;
+    float f = fract(u * folds);
+    float face = step(0.5, f);
+    float pleat = 1.0 - abs(f - 0.5) * 2.0;
+
+    vec3 col = mix(midc, light, smoothstep(0.3, 0.98, r));
+    col *= mix(0.8, 1.06, face * 0.65 + pleat * 0.35);
+    // Fine paper lines and crease shadows.
+    col *= 0.95 + 0.05 * sin(u * folds * 40.0);
+    col *= 1.0 - 0.3 * smoothstep(0.05, 0.0, min(f, 1.0 - f));
+
+    // Rim band.
+    col = mix(col, deep, smoothstep(0.952, 0.962, r));
+    col += light * 0.5 * smoothstep(0.01, 0.0, abs(r - 0.952));
+
+    // Inner ribs and hub.
+    float inner = 1.0 - smoothstep(0.27, 0.29, r);
+    vec3 ribs = mix(brown, deep, 0.5 + 0.5 * cos(u * folds * 6.2831853));
+    col = mix(col, ribs, inner);
+    col += light * 0.35 * smoothstep(0.008, 0.0, abs(r - 0.28));
+    col = mix(col, light * 1.1, 1.0 - smoothstep(0.055, 0.065, r));
+
+    // Guard sticks at both edges.
+    float edge = min(th, span - th) * r;
+    col = mix(col, deep, smoothstep(0.012, 0.004, edge));
+
+    // A slow sheen sweeping across the leaf.
+    float sweep = exp(-pow((u - (fract(uTime * 0.07) * 1.8 - 0.4)) / 0.07, 2.0));
+    col += light * sweep * 0.3 * smoothstep(0.3, 0.6, r);
+
+    float alpha = 1.0 - smoothstep(0.994, 1.0, r);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function createFan() {
+  const material = new THREE.ShaderMaterial({
+    vertexShader: fanVertex,
+    fragmentShader: fanFragment,
+    uniforms: { uOpen: { value: 0 }, uTime: { value: 0 } },
+    transparent: true,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 180, 0, Math.PI), material);
+  mesh.renderOrder = 3;
+  return mesh;
 }
 
-function drawLeaf(ctx, x, y, angle, len, width, style) {
+// ---------- Foliage corner (bottom-left; mirrored for the right) ----------
+
+function broadLeaf(ctx, x, y, angle, len, width, tone) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-  const path = leafPath(len, width);
-  const g = ctx.createLinearGradient(0, -width / 2, len, width / 2);
-  g.addColorStop(0, style[0]);
-  g.addColorStop(0.5, style[1]);
-  g.addColorStop(1, style[2]);
+  const p = new Path2D();
+  p.moveTo(0, 0);
+  p.bezierCurveTo(len * 0.18, -width, len * 0.72, -width * 0.95, len, 0);
+  p.bezierCurveTo(len * 0.72, width * 0.95, len * 0.18, width, 0, 0);
+  const g = ctx.createLinearGradient(0, -width, len, width);
+  g.addColorStop(0, tone[0]);
+  g.addColorStop(0.55, tone[1]);
+  g.addColorStop(1, tone[2]);
   ctx.fillStyle = g;
-  ctx.fill(path);
-
+  ctx.fill(p);
   ctx.save();
-  ctx.clip(path);
-  // Light from above: soft sheen on one half.
-  const sheen = ctx.createLinearGradient(0, -width, 0, width);
-  sheen.addColorStop(0, 'rgba(255,255,255,0.18)');
-  sheen.addColorStop(0.5, 'rgba(255,255,255,0)');
-  ctx.fillStyle = sheen;
-  ctx.fill(path);
-  ctx.strokeStyle = 'rgba(247, 214, 140, 0.55)';
-  ctx.lineWidth = Math.max(1, width * 0.035);
-  for (let k = 1; k <= 5; k++) {
-    const t = k / 6.5;
+  ctx.clip(p);
+  const shade = ctx.createLinearGradient(0, -width, 0, width);
+  shade.addColorStop(0, 'rgba(255,255,230,0.18)');
+  shade.addColorStop(0.5, 'rgba(0,0,0,0)');
+  shade.addColorStop(1, 'rgba(0,20,0,0.3)');
+  ctx.fillStyle = shade;
+  ctx.fill(p);
+  ctx.strokeStyle = 'rgba(214, 236, 170, 0.45)';
+  ctx.lineWidth = 3;
+  for (let k = 1; k <= 7; k++) {
+    const t = k / 8;
     for (const s of [-1, 1]) {
       ctx.beginPath();
-      ctx.moveTo(len * t, 0);
-      ctx.quadraticCurveTo(len * (t + 0.08), s * width * 0.25, len * (t + 0.16), s * width * 0.55 * (1 - t * 0.6));
+      ctx.moveTo(len * t * 0.9, 0);
+      ctx.quadraticCurveTo(len * (t * 0.9 + 0.08), s * width * 0.4, len * (t * 0.9 + 0.15), s * width * 0.85);
       ctx.stroke();
     }
   }
   ctx.restore();
-
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = Math.max(1.5, width * 0.05);
+  ctx.strokeStyle = 'rgba(226, 244, 190, 0.75)';
+  ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.quadraticCurveTo(len * 0.5, width * 0.06, len * 0.97, 0);
+  ctx.quadraticCurveTo(len * 0.5, width * 0.08, len * 0.97, 0);
   ctx.stroke();
-  ctx.lineWidth = Math.max(1.2, width * 0.035);
-  ctx.stroke(path);
   ctx.restore();
 }
 
-function cubic(p0, p1, p2, p3, t) {
-  const u = 1 - t;
-  return [
-    u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
-    u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+function flower(ctx, x, y, r, rand) {
+  const layers = [
+    { n: 9, len: 1.0, w: 0.42, c: ['#f6c6a3', '#e9906b'] },
+    { n: 8, len: 0.78, w: 0.38, c: ['#fbd9bd', '#f0a582'] },
+    { n: 7, len: 0.52, w: 0.34, c: ['#fde9d4', '#f6bd98'] },
   ];
-}
-
-// A curving branch from the bottom-left corner towards the top-right.
-const BRANCH_BASE = [40, 990];
-function drawBranch(seed) {
-  const [canvas, ctx] = makeCanvas(1024, 1024);
-  let s = seed;
-  const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const P = [BRANCH_BASE, [200, 640], [520, 420], [940, 300]];
-
-  ctx.lineCap = 'round';
-  const steps = 60;
-  for (let i = 0; i < steps; i++) {
-    const a = cubic(...P, i / steps);
-    const b = cubic(...P, (i + 1) / steps);
-    ctx.strokeStyle = i % 2 ? '#c8953a' : '#d9a649';
-    ctx.lineWidth = 16 * (1 - i / steps) + 3;
+  layers.forEach((layer, li) => {
+    for (let i = 0; i < layer.n; i++) {
+      const a = (i / layer.n) * Math.PI * 2 + li * 0.35 + rand() * 0.2;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(a);
+      const pl = r * layer.len;
+      const pw = r * layer.w;
+      const p = new Path2D();
+      p.moveTo(0, 0);
+      p.bezierCurveTo(pl * 0.3, -pw, pl * 0.9, -pw * 0.9, pl, 0);
+      p.bezierCurveTo(pl * 0.9, pw * 0.9, pl * 0.3, pw, 0, 0);
+      const g = ctx.createLinearGradient(0, 0, pl, 0);
+      g.addColorStop(0, layer.c[1]);
+      g.addColorStop(1, layer.c[0]);
+      ctx.fillStyle = g;
+      ctx.fill(p);
+      ctx.strokeStyle = 'rgba(180, 90, 60, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.stroke(p);
+      ctx.restore();
+    }
+  });
+  const c = ctx.createRadialGradient(x, y, 0, x, y, r * 0.2);
+  c.addColorStop(0, '#f7dd8a');
+  c.addColorStop(1, '#d99a3a');
+  ctx.fillStyle = c;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff1b8';
+  for (let i = 0; i < 18; i++) {
+    const a = rand() * Math.PI * 2;
+    const d = rand() * r * 0.16;
     ctx.beginPath();
-    ctx.moveTo(...a);
-    ctx.lineTo(...b);
-    ctx.stroke();
-  }
-
-  const styles = [LEAF_STYLES.purple, LEAF_STYLES.purple, LEAF_STYLES.plum, LEAF_STYLES.gold];
-  let side = 1;
-  for (let t = 0.1; t < 0.97; t += 0.085) {
-    const [x, y] = cubic(...P, t);
-    const [x2, y2] = cubic(...P, Math.min(1, t + 0.01));
-    const tangent = Math.atan2(y2 - y, x2 - x);
-    const len = 250 * (1 - t * 0.5) * (0.85 + rand() * 0.3);
-    const angle = tangent + side * (0.7 + rand() * 0.35);
-    // Short stalk.
-    const sx = x + Math.cos(angle) * 14;
-    const sy = y + Math.sin(angle) * 14;
-    ctx.strokeStyle = '#c8953a';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(sx, sy);
-    ctx.stroke();
-    drawLeaf(ctx, sx, sy, angle, len, len * 0.32, styles[Math.floor(rand() * styles.length)]);
-    side = -side;
-  }
-  const [tx, ty] = cubic(...P, 1);
-  drawLeaf(ctx, tx - 6, ty + 2, -0.25, 170, 52, LEAF_STYLES.gold);
-
-  // Golden buds.
-  for (const t of [0.22, 0.47, 0.71, 0.88]) {
-    const [x, y] = cubic(...P, t);
-    const glow = ctx.createRadialGradient(x, y - 14, 0, x, y - 14, 26);
-    glow.addColorStop(0, 'rgba(255, 238, 190, 1)');
-    glow.addColorStop(0.4, 'rgba(244, 205, 120, 0.9)');
-    glow.addColorStop(1, 'rgba(244, 205, 120, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(x, y - 14, 26, 0, Math.PI * 2);
+    ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 3, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+const GREENS = [
+  ['#16361f', '#2f6a35', '#6fa253'],
+  ['#1b402a', '#3b7c45', '#8fbd66'],
+  ['#12301c', '#275c30', '#5b8f45'],
+];
+
+function drawFoliage(seed) {
+  const S = 1024;
+  const [canvas, ctx] = makeCanvas(S, S);
+  const rand = rng(seed);
+  const leaves = [
+    [-1.45, 640, 150],
+    [-1.15, 700, 165],
+    [-0.85, 660, 160],
+    [-0.55, 600, 150],
+    [-0.28, 560, 140],
+    [-1.3, 470, 120],
+    [-0.7, 480, 125],
+    [-0.12, 430, 110],
+  ];
+  leaves.forEach(([a, len, w], i) => {
+    broadLeaf(ctx, 20 + rand() * 40, S - 10 - rand() * 30, a + (rand() - 0.5) * 0.12, len, w, GREENS[i % 3]);
+  });
+  flower(ctx, 360, S - 300, 170, rand);
+  flower(ctx, 640, S - 120, 110, rand);
+  // A bud.
+  ctx.save();
+  ctx.translate(180, S - 470);
+  ctx.rotate(-0.5);
+  const bud = ctx.createLinearGradient(0, -60, 0, 60);
+  bud.addColorStop(0, '#fbd5b7');
+  bud.addColorStop(1, '#e7906c');
+  ctx.fillStyle = bud;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 36, 62, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
   return canvas;
 }
 
-function drawSingleLeaf(style) {
-  const [canvas, ctx] = makeCanvas(512, 256);
-  drawLeaf(ctx, 16, 128, 0, 480, 140, style);
+function drawPetal() {
+  const [canvas, ctx] = makeCanvas(256, 128);
+  const g = ctx.createLinearGradient(0, 0, 256, 0);
+  g.addColorStop(0, '#ea946f');
+  g.addColorStop(1, '#fbdcc2');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(10, 64);
+  ctx.bezierCurveTo(70, 4, 210, 8, 246, 64);
+  ctx.bezierCurveTo(210, 120, 70, 124, 10, 64);
+  ctx.fill();
   return canvas;
 }
 
@@ -317,134 +496,88 @@ export function createScenery() {
   const backdrop = createBackdrop();
   group.add(backdrop);
 
-  const view = { fov: 35, aspect: 1, camZ: 14 };
-  const halfH = (z) => Math.tan(THREE.MathUtils.degToRad(view.fov / 2)) * (view.camZ - z);
-  const halfW = (z) => halfH(z) * view.aspect;
+  // Layout in world units at z = 0, filled in by layout().
+  const L = { hw: 1, hh: 1, ringX: 0, ringY: 0, rx: 3, ry: 3, fanY: -5, fanR: 3, camZ: 14, fov: 35 };
+  const halfH = (z) => Math.tan(THREE.MathUtils.degToRad(L.fov / 2)) * (L.camZ - z);
 
-  // Halo rings behind the pair.
-  const halo = new THREE.Group();
-  halo.position.z = -3;
-  for (const [r, w, o] of [
-    [3.1, 0.018, 0.5],
-    [3.32, 0.008, 0.35],
-    [2.7, 0.006, 0.25],
-  ]) {
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(r, r + w, 256),
-      new THREE.MeshBasicMaterial({
-        color: GOLD,
-        transparent: true,
-        opacity: o,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    );
-    halo.add(ring);
-  }
-  const beads = new THREE.Points(
-    new THREE.BufferGeometry().setFromPoints(
-      Array.from({ length: 72 }, (_, i) => {
-        const a = (i / 72) * Math.PI * 2;
-        return new THREE.Vector3(Math.cos(a) * 3.21, Math.sin(a) * 3.21, 0);
-      }),
-    ),
-    new THREE.PointsMaterial({
-      color: GOLD,
-      size: 0.05,
-      transparent: true,
-      opacity: 0.7,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
-  halo.add(beads);
-  group.add(halo);
-
-  // Clouds.
-  const cloudTextures = CLOUDS.map((c) => canvasTexture(drawCloud(c)));
-  const cloudSpecs = [
-    { tex: 0, z: -9, y: 0.62, s: 6.2, v: 0.07, o: 0.75, x: -0.6 },
-    { tex: 1, z: -8, y: -0.7, s: 5.6, v: -0.06, o: 0.7, x: 0.5 },
-    { tex: 2, z: -12, y: 0.05, s: 7.5, v: 0.04, o: 0.45, x: 0.9 },
-    { tex: 1, z: -6.5, y: 0.45, s: 3.6, v: -0.09, o: 0.65, x: 0.75 },
-    { tex: 0, z: -7, y: -0.35, s: 4.0, v: 0.08, o: 0.6, x: -0.85 },
-    { tex: 2, z: -13, y: 0.85, s: 7, v: -0.035, o: 0.4, x: -0.1 },
-    { tex: 0, z: -5, y: -0.85, s: 3.0, v: 0.1, o: 0.65, x: 0.1 },
-  ];
-  const clouds = cloudSpecs.map((spec) => {
+  // Cloud wreath.
+  const swirlTextures = {};
+  const swirlTex = (ink, variant) => {
+    const key = `${ink}${variant}`;
+    swirlTextures[key] ??= texture(drawSwirl(ink, Object.keys(INKS).indexOf(ink) * 3 + variant + 1));
+    return swirlTextures[key];
+  };
+  const cloudGeo = new THREE.PlaneGeometry(1, 0.5);
+  const clouds = WREATH.map((ink, i) => {
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(1, 0.5),
-      new THREE.MeshBasicMaterial({
-        map: cloudTextures[spec.tex],
-        transparent: true,
-        opacity: spec.o,
-        depthWrite: false,
-      }),
+      cloudGeo,
+      new THREE.MeshBasicMaterial({ map: swirlTex(ink, i % 2), transparent: true, depthWrite: false }),
     );
-    mesh.scale.setScalar(spec.s);
-    if (spec.v < 0) mesh.scale.x *= -1;
-    mesh.position.z = spec.z;
-    mesh.userData = { ...spec, offset: 0 };
-    mesh.renderOrder = -5;
+    mesh.userData = {
+      angle: Math.PI / 2 + (i / WREATH.length) * Math.PI * 2,
+      radial: 0.9 + (((i * 37) % 9) / 9) * 0.22,
+      size: 2.1 + (((i * 53) % 7) / 7) * 1.4,
+      flip: [1, -1, 1, 1, -1, 1, -1, -1, 1, -1, 1][i % 11], // curl inwards or outwards
+      tilt: (((i * 29) % 11) / 11 - 0.5) * 0.9, // some clouds lean out of the ring
+      z: -0.6 - (i % 4) * 0.25,
+      seed: i * 1.7,
+    };
+    mesh.renderOrder = 1;
     group.add(mesh);
     return mesh;
   });
 
-  // Branches in two corners.
-  const branchTextures = [canvasTexture(drawBranch(7)), canvasTexture(drawBranch(31))];
-  const branchGeo = new THREE.PlaneGeometry(1, 1);
-  branchGeo.translate(0.5 - BRANCH_BASE[0] / 1024, 0.5 - (1 - BRANCH_BASE[1] / 1024), 0);
-  const branches = [
-    { corner: [-1, -1], rot: 0, z: -2.2, tex: 0, phase: 0 },
-    { corner: [1, 1], rot: Math.PI, z: -2.6, tex: 1, phase: 2 },
-  ].map((spec) => {
+  const fan = createFan();
+  group.add(fan);
+
+  const foliageTex = [texture(drawFoliage(11)), texture(drawFoliage(29))];
+  const foliageGeo = new THREE.PlaneGeometry(1, 1);
+  foliageGeo.translate(0.5, 0.5, 0);
+  const foliage = [-1, 1].map((side, i) => {
     const mesh = new THREE.Mesh(
-      branchGeo,
-      new THREE.MeshBasicMaterial({ map: branchTextures[spec.tex], transparent: true, depthWrite: false }),
+      foliageGeo,
+      new THREE.MeshBasicMaterial({ map: foliageTex[i], transparent: true, depthWrite: false }),
     );
-    mesh.position.z = spec.z;
-    mesh.userData = spec;
-    mesh.renderOrder = -2;
+    mesh.userData = { side, phase: i * 2.3 };
+    mesh.position.z = 0.15;
+    mesh.renderOrder = 2;
     group.add(mesh);
     return mesh;
   });
 
-  // Loose leaves drifting and tumbling.
-  const leafTextures = [LEAF_STYLES.purple, LEAF_STYLES.gold, LEAF_STYLES.plum].map((s) =>
-    canvasTexture(drawSingleLeaf(s)),
-  );
-  const leafGeo = new THREE.PlaneGeometry(1, 0.5);
-  const leaves = Array.from({ length: 7 }, (_, i) => {
+  // Falling petals.
+  const petalTex = texture(drawPetal());
+  const petalGeo = new THREE.PlaneGeometry(0.34, 0.17);
+  const petals = Array.from({ length: 9 }, (_, i) => {
     const mesh = new THREE.Mesh(
-      leafGeo,
+      petalGeo,
       new THREE.MeshBasicMaterial({
-        map: leafTextures[i % 3],
+        map: petalTex,
         transparent: true,
         side: THREE.DoubleSide,
         depthWrite: false,
-        opacity: 0.9,
+        opacity: 0.85,
       }),
     );
-    mesh.scale.setScalar(0.55 + Math.random() * 0.45);
-    mesh.position.z = -1.5 - Math.random() * 4.5;
+    mesh.position.z = -0.5 - Math.random() * 3;
     mesh.userData = {
       x: Math.random() * 2 - 1,
-      y: Math.random() * 1.6 - 0.8,
-      vx: 0.12 + Math.random() * 0.12,
-      spin: [0.4 + Math.random() * 0.6, 0.3 + Math.random() * 0.5, 0.2 + Math.random() * 0.4],
-      seed: Math.random() * 10,
+      y: Math.random() * 2 - 1,
+      vy: 0.1 + Math.random() * 0.12,
+      spin: [0.6 + Math.random(), 0.4 + Math.random(), 0.3 + Math.random() * 0.5],
+      seed: i * 3.1,
     };
-    mesh.renderOrder = -1;
+    mesh.renderOrder = 4;
     group.add(mesh);
     return mesh;
   });
 
-  // Golden dust.
-  const dustCount = 500;
+  // Faint warm dust.
+  const dustCount = 260;
   const dustPos = new Float32Array(dustCount * 3);
   const dustSeed = new Float32Array(dustCount);
   for (let i = 0; i < dustCount; i++) {
-    dustPos.set([(Math.random() - 0.5) * 40, (Math.random() - 0.5) * 24, -1 - Math.random() * 16], i * 3);
+    dustPos.set([(Math.random() - 0.5) * 30, (Math.random() - 0.5) * 24, -1 - Math.random() * 10], i * 3);
     dustSeed[i] = Math.random();
   }
   const dustGeo = new THREE.BufferGeometry();
@@ -461,18 +594,18 @@ export function createScenery() {
         varying float vAlpha;
         void main() {
           vec3 p = position;
-          p.y = mod(p.y + uTime * (0.1 + aSeed * 0.25) + 12.0, 24.0) - 12.0;
-          p.x += sin(uTime * 0.25 + aSeed * 30.0) * 0.6;
+          p.y = mod(p.y + uTime * (0.06 + aSeed * 0.15) + 12.0, 24.0) - 12.0;
+          p.x += sin(uTime * 0.2 + aSeed * 30.0) * 0.5;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
-          gl_PointSize = (2.0 + aSeed * 6.0) * uPixelRatio * (12.0 / -mv.z);
-          vAlpha = (0.3 + 0.7 * fract(aSeed * 17.3)) * (0.55 + 0.45 * sin(uTime * 1.3 + aSeed * 60.0));
+          gl_PointSize = (2.0 + aSeed * 4.0) * uPixelRatio * (12.0 / -mv.z);
+          vAlpha = (0.25 + 0.75 * fract(aSeed * 17.3)) * (0.5 + 0.5 * sin(uTime * 1.1 + aSeed * 60.0));
         }`,
       fragmentShader: /* glsl */ `
         varying float vAlpha;
         void main() {
           float a = smoothstep(0.5, 0.0, length(gl_PointCoord - 0.5));
-          gl_FragColor = vec4(vec3(1.0, 0.75, 0.38) * a * vAlpha * 0.6, 1.0);
+          gl_FragColor = vec4(vec3(1.0, 0.85, 0.6) * a * vAlpha * 0.35, 1.0);
         }`,
       transparent: true,
       depthWrite: false,
@@ -482,61 +615,78 @@ export function createScenery() {
   dust.frustumCulled = false;
   group.add(dust);
 
-  function resize(width, height, pixelRatio, camZ, stageY) {
-    halo.position.y = stageY;
-    view.aspect = width / height;
-    view.camZ = camZ;
-    backdrop.material.uniforms.uRes.value.set(width * pixelRatio, height * pixelRatio);
+  // next: { hw, hh, ringX, ringY, rx, ry, fanY, fanR } in world units at z = 0.
+  function layout(next, pxW, pxH, pixelRatio, camZ, fov) {
+    Object.assign(L, next, { camZ, fov });
+    const u = backdrop.material.uniforms;
+    u.uRes.value.set(pxW, pxH);
+    u.uCenter.value.set(((L.ringX / L.hw) * 0.5 + 0.5) * pxW, ((L.ringY / L.hh) * 0.5 + 0.5) * pxH);
+    u.uRadius.value = (Math.max(L.rx, L.ry) / L.hh) * 0.5 * pxH;
     dust.material.uniforms.uPixelRatio.value = pixelRatio;
-    for (const b of branches) {
-      const hw = halfW(b.position.z);
-      const hh = halfH(b.position.z);
-      const size = Math.min(hw * 0.8, hh * 1.3);
-      b.scale.set(size, size, 1);
-      b.position.x = b.userData.corner[0] * (hw + size * 0.04);
-      b.position.y = b.userData.corner[1] * (hh + size * 0.04);
+
+    fan.position.set(L.ringX, L.fanY, 0.5);
+    fan.scale.setScalar(L.fanR);
+    const size = Math.min(L.hw * 1.05, L.hh * 0.75);
+    for (const f of foliage) {
+      const side = f.userData.side;
+      f.scale.set(-side * size, size, 1);
+      f.position.x = side * (L.hw + size * 0.05);
+      // Sit just above the fan's edge where it meets the screen edge, so the
+      // leaves still peek out when the fan is wider than the screen.
+      const edgeY = L.fanY + Math.sqrt(Math.max(0, L.fanR * L.fanR - L.hw * L.hw));
+      f.position.y = Math.max(-L.hh - size * 0.06, edgeY - size * 0.45);
     }
   }
 
-  function update(dt, t, mouse, motion) {
+  function update(dt, t, local, motion) {
     backdrop.material.uniforms.uTime.value = t;
-    backdrop.material.uniforms.uMouse.value.set(mouse.x, mouse.y);
     dust.material.uniforms.uTime.value = t;
-    halo.rotation.z = t * 0.03;
-    halo.scale.setScalar(1 + Math.sin(t * 0.7) * 0.01);
+    const fu = fan.material.uniforms;
+    fu.uOpen.value = ease((local - 0.6) / 1.8);
+    fu.uTime.value = t;
 
-    for (const c of clouds) {
+    // Wreath: clouds sweep into place one after another, then the whole ring
+    // turns very slowly while each cloud breathes.
+    const turn = t * 0.012 * motion;
+    const unit = (Math.PI * (L.rx + L.ry)) / clouds.length;
+    clouds.forEach((c, i) => {
       const d = c.userData;
-      const hw = halfW(c.position.z) + d.s * 0.55;
-      d.offset += d.v * dt * motion;
-      let x = d.x * halfW(c.position.z) + d.offset;
-      x = ((((x + hw) % (2 * hw)) + 2 * hw) % (2 * hw)) - hw;
-      c.position.x = x;
-      c.position.y = d.y * halfH(c.position.z) + Math.sin(t * 0.2 + d.s) * 0.12;
+      const k = ease((local - 0.1 - i * 0.09) / 1.3);
+      const a = d.angle + turn - (1 - k) * 0.9;
+      const breathe = 1 + Math.sin(t * 0.5 + d.seed) * 0.035 * motion;
+      const rr = d.radial + Math.sin(t * 0.3 + d.seed) * 0.015;
+      c.position.set(L.ringX + Math.cos(a) * L.rx * rr, L.ringY + Math.sin(a) * L.ry * rr, d.z);
+      // Follow the ellipse's tangent so each cloud flows around the ring.
+      const tangent = Math.atan2(Math.cos(a) * L.ry, -Math.sin(a) * L.rx);
+      c.rotation.z = tangent + d.tilt + Math.sin(t * 0.4 + d.seed) * 0.04 * motion;
+      const len = unit * d.size * (0.7 + 0.3 * k) * breathe;
+      c.scale.set(len, len * d.flip, 1);
+      c.material.opacity = k;
+    });
+
+    for (const f of foliage) {
+      const d = f.userData;
+      f.rotation.z = -d.side * Math.sin(t * 0.5 + d.phase) * 0.02 * motion;
     }
 
-    for (const b of branches) {
-      const d = b.userData;
-      b.rotation.z = d.rot + Math.sin(t * 0.55 + d.phase) * 0.03 * motion + mouse.x * 0.015;
-    }
-
-    for (const leaf of leaves) {
-      const d = leaf.userData;
-      const hw = halfW(leaf.position.z) + 1;
-      d.x += (d.vx * dt * motion) / hw;
-      if (d.x > 1) {
-        d.x = -1;
-        d.y = Math.random() * 1.6 - 0.8;
+    for (const p of petals) {
+      const d = p.userData;
+      const hh = halfH(p.position.z);
+      const hw = hh * (L.hw / L.hh);
+      d.y -= (d.vy * dt * motion) / hh;
+      if (d.y < -1.1) {
+        d.y = 1.1;
+        d.x = Math.random() * 2 - 1;
       }
-      leaf.position.x = d.x * hw;
-      leaf.position.y = d.y * halfH(leaf.position.z) + Math.sin(t * 0.6 + d.seed) * 0.5;
-      leaf.rotation.set(
-        Math.sin(t * d.spin[0] + d.seed) * 1.1,
+      p.position.x = d.x * hw + Math.sin(t * 0.5 + d.seed) * 0.6;
+      p.position.y = d.y * hh;
+      p.rotation.set(
+        Math.sin(t * d.spin[0] + d.seed) * 1.2,
         t * d.spin[1] * motion + d.seed,
-        Math.sin(t * d.spin[2] + d.seed * 2) * 0.8,
+        Math.sin(t * d.spin[2] + d.seed) * 0.9,
       );
     }
   }
 
-  return { group, resize, update };
+  return { group, layout, update };
 }
